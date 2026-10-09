@@ -1,0 +1,27 @@
+# Python 缓存
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+# 虚拟环境
+.venv/
+venv/
+
+# 本地数据库及相关文件
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+
+# 数据备份
+backups/
+
+# 本地密钥配置
+.env
+.env.*
+!.env.example
+
+# 日志
+*.log
