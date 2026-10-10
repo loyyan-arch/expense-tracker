@@ -23,4 +23,5 @@ app.include_router(health.router)
 
 @app.get("/")
 def home():
-    return {"message": "欢迎使用个人记账 API"}
+    return {"message": "欢迎使用个人记账 API",
+            "version": "1.0.0",}

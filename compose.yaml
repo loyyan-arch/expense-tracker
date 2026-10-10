@@ -2,7 +2,7 @@ name: expense-tracker
 
 services:
   api:
-    image: expense-tracker:local
+    image: expense-tracker:1.0.0
     build: .
 
     env_file:
