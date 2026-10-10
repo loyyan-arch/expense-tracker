@@ -1,3 +1,4 @@
+from re import U
 from fastapi import FastAPI, HTTPException,Response,Query, Depends
 from datetime import date
 from typing import Literal
@@ -5,7 +6,7 @@ from typing import Literal
 from sqlalchemy.orm import Session
 from sqlalchemy import select,func
 
-from db import engine
+from db import get_db
 from models import Transaction,User
 
 from sqlalchemy.exc import IntegrityError
@@ -46,6 +47,7 @@ def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(
         bearer_scheme
     ),
+    session: Session = Depends(get_db),
 ) -> UserPublic:
     unauthorized = HTTPException(
         status_code=401,
@@ -61,16 +63,16 @@ def get_current_user(
     except InvalidTokenError:
         raise unauthorized
 
-    with Session(engine) as session:
-        user = session.get(User, user_id)
 
-        if user is None:
-            raise unauthorized
+    user = session.get(User, user_id)
 
-        return UserPublic(
-            id=user.id,
-            username=user.username,
-        )
+    if user is None:
+        raise unauthorized
+
+    return UserPublic(
+        id=user.id,
+        username=user.username,
+    )
     
 @app.get("/auth/me", response_model=UserPublic)
 def get_me(
@@ -90,80 +92,86 @@ def home():
 
 
 @app.get("/transactions/{id}")
-def get_transaction(id: int,current_user: UserPublic = Depends(get_current_user),):
-    with Session(engine) as session:
-        transaction = session.scalar(
-            select(Transaction).where(
-                Transaction.id == id,
-                Transaction.user_id == current_user.id,
-            )
+def get_transaction(id: int,current_user: UserPublic = Depends(get_current_user),
+                    session: Session = Depends(get_db),):
+
+    transaction = session.scalar(
+        select(Transaction).where(
+            Transaction.id == id,
+            Transaction.user_id == current_user.id,
+        )
+    )
+
+    if transaction is None:
+        raise HTTPException(
+            status_code=404,
+            detail="账单不存在",
         )
 
-        if transaction is None:
-            raise HTTPException(
-                status_code=404,
-                detail="账单不存在",
-            )
-
-        return {
-            "id": transaction.id,
-            "kind": transaction.kind,
-            "amount_cents": transaction.amount_cents,
-            "category": transaction.category,
-            "occurred_on": transaction.occurred_on,
-            "note": transaction.note,
-            "created_at": transaction.created_at,
-        }
+    return {
+        "id": transaction.id,
+        "kind": transaction.kind,
+        "amount_cents": transaction.amount_cents,
+        "category": transaction.category,
+        "occurred_on": transaction.occurred_on,
+        "note": transaction.note,
+        "created_at": transaction.created_at,
+    }
 
 
 
 @app.post("/transactions", status_code=201)
-def create_transaction(body: TransactionCreate,current_user: UserPublic = Depends(get_current_user),):
-    with Session(engine) as session:
-        transaction = Transaction(
-            **body.model_dump(),
-            user_id=current_user.id,
-        )
+def create_transaction(body: TransactionCreate,current_user: UserPublic = Depends(get_current_user),
+                       session: Session = Depends(get_db),):
 
-        session.add(transaction)
-        session.commit()
-        session.refresh(transaction)
+    transaction = Transaction(
+        **body.model_dump(),
+        user_id=current_user.id,
+    )
 
-        return {
-            "id": transaction.id,
-            "kind": transaction.kind,
-            "amount_cents": transaction.amount_cents,
-            "category": transaction.category,
-            "occurred_on": transaction.occurred_on,
-            "note": transaction.note,
-            "created_at": transaction.created_at,
-        }
+    session.add(transaction)
+    session.commit()
+    session.refresh(transaction)
+
+    return {
+        "id": transaction.id,
+        "kind": transaction.kind,
+        "amount_cents": transaction.amount_cents,
+        "category": transaction.category,
+        "occurred_on": transaction.occurred_on,
+        "note": transaction.note,
+        "created_at": transaction.created_at,
+    }
     
 
 @app.delete("/transactions/{id}", status_code=204)
-def delete_transaction(id: int,current_user: UserPublic = Depends(get_current_user),):
-    with Session(engine) as session:
-        transaction = session.scalar(
-            select(Transaction).where(
-                Transaction.id == id,
-                Transaction.user_id == current_user.id,
-            )
+def delete_transaction(
+    id: int,
+    current_user: UserPublic = Depends(get_current_user),
+    session: Session = Depends(get_db),
+):
+    transaction = session.scalar(
+        select(Transaction).where(
+            Transaction.id == id,
+            Transaction.user_id == current_user.id,
+        )
+    )
+
+    if transaction is None:
+        raise HTTPException(
+            status_code=404,
+            detail="账单不存在",
         )
 
-        if transaction is None:
-            raise HTTPException(
-                status_code=404,
-                detail="账单不存在",
-            )
-
-        session.delete(transaction)
-        session.commit()
+    session.delete(transaction)
+    session.commit()
 
     return Response(status_code=204)
 
 
 @app.patch("/transactions/{id}")
-def update_transaction(id: int, body: TransactionUpdate,current_user: UserPublic = Depends(get_current_user),):
+def update_transaction(id: int, body: TransactionUpdate,current_user: UserPublic = Depends(get_current_user),
+                       session: Session = Depends(get_db),):
     changes = body.model_dump(exclude_unset=True)
 
     if not changes:
@@ -178,41 +186,42 @@ def update_transaction(id: int, body: TransactionUpdate,current_user: UserPublic
             detail="修改字段不能为 null",
         )
 
-    with Session(engine) as session:
-        transaction = session.scalar(
-            select(Transaction).where(
-                Transaction.id == id,
-                Transaction.user_id == current_user.id,
-            )
+
+    transaction = session.scalar(
+        select(Transaction).where(
+            Transaction.id == id,
+            Transaction.user_id == current_user.id,
+        )
+    )
+
+    if transaction is None:
+        raise HTTPException(
+            status_code=404,
+            detail="账单不存在",
         )
 
-        if transaction is None:
-            raise HTTPException(
-                status_code=404,
-                detail="账单不存在",
-            )
+    for field, value in changes.items():
+        setattr(transaction, field, value)
 
-        for field, value in changes.items():
-            setattr(transaction, field, value)
+    session.commit()
+    session.refresh(transaction)
 
-        session.commit()
-        session.refresh(transaction)
-
-        return {
-            "id": transaction.id,
-            "kind": transaction.kind,
-            "amount_cents": transaction.amount_cents,
-            "category": transaction.category,
-            "occurred_on": transaction.occurred_on,
-            "note": transaction.note,
-            "created_at": transaction.created_at,
-        }
+    return {
+        "id": transaction.id,
+        "kind": transaction.kind,
+        "amount_cents": transaction.amount_cents,
+        "category": transaction.category,
+        "occurred_on": transaction.occurred_on,
+        "note": transaction.note,
+        "created_at": transaction.created_at,
+    }
     
 
 @app.get("/transactions")
 def list_transactions(
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=10, ge=1, le=100),
+    session: Session = Depends(get_db),
     current_user: UserPublic = Depends(get_current_user),
     category: Literal[
         "餐饮", "交通", "购物", "工资", "其他"
@@ -260,24 +269,25 @@ def list_transactions(
         .limit(limit)
     )
 
-    with Session(engine) as session:
-        transactions = session.scalars(statement).all()
 
-        return [
-            {
-                "id": transaction.id,
-                "kind": transaction.kind,
-                "amount_cents": transaction.amount_cents,
-                "category": transaction.category,
-                "occurred_on": transaction.occurred_on,
-                "note": transaction.note,
-                "created_at": transaction.created_at,
-            }
-            for transaction in transactions
-        ]
+    transactions = session.scalars(statement).all()
+
+    return [
+        {
+            "id": transaction.id,
+            "kind": transaction.kind,
+            "amount_cents": transaction.amount_cents,
+            "category": transaction.category,
+            "occurred_on": transaction.occurred_on,
+            "note": transaction.note,
+            "created_at": transaction.created_at,
+        }
+        for transaction in transactions
+    ]
     
 @app.get("/statistics/monthly")
 def get_monthly_statistics(
+    session: Session = Depends(get_db),
     current_user: UserPublic = Depends(get_current_user),
     month: str = Query(
         ...,
@@ -312,8 +322,8 @@ def get_monthly_statistics(
         .group_by(Transaction.kind)
     )
 
-    with Session(engine) as session:
-        rows = session.execute(statement).all()
+
+    rows = session.execute(statement).all()
 
     totals = {
         "income": 0,
@@ -339,73 +349,72 @@ def get_monthly_statistics(
     status_code=201,
     response_model=UserPublic,
 )
-def register(body: UserCreate):
+def register(body: UserCreate,session: Session = Depends(get_db),):
     hashed_password = hash_password(body.password)
 
-    with Session(engine) as session:
-        user = User(
-            username=body.username,
-            password_hash=hashed_password,
-        )
+    user = User(
+        username=body.username,
+        password_hash=hashed_password,
+    )
 
-        session.add(user)
+    session.add(user)
 
-        try:
-            session.commit()
-        except IntegrityError:
-            session.rollback()
+    try:
+        session.commit()
+    except IntegrityError:
+        session.rollback()
 
-            existing_user = session.scalar(
-                select(User).where(
-                    User.username == body.username
-                )
-            )
-
-            if existing_user is not None:
-                raise HTTPException(
-                    status_code=409,
-                    detail="用户名已存在",
-                )
-
-            raise
-
-        session.refresh(user)
-
-        return {
-            "id": user.id,
-            "username": user.username,
-        }
-    
-
-@app.post("/auth/login", response_model=TokenResponse)
-def login(body: UserLogin):
-    with Session(engine) as session:
-        user = session.scalar(
+        existing_user = session.scalar(
             select(User).where(
                 User.username == body.username
             )
         )
 
-        stored_hash = (
-            user.password_hash
-            if user is not None
-            else DUMMY_PASSWORD_HASH
-        )
-
-        password_valid = verify_password(
-            body.password,
-            stored_hash,
-        )
-
-        if user is None or not password_valid:
+        if existing_user is not None:
             raise HTTPException(
-                status_code=401,
-                detail="用户名或密码错误",
+                status_code=409,
+                detail="用户名已存在",
             )
 
-        token = create_access_token(user.id)
+        raise
 
-        return {
-            "access_token": token,
-            "token_type": "bearer",
-        }
+    session.refresh(user)
+
+    return {
+        "id": user.id,
+        "username": user.username,
+    }
+    
+
+@app.post("/auth/login", response_model=TokenResponse)
+def login(body: UserLogin,session: Session = Depends(get_db),):
+
+    user = session.scalar(
+        select(User).where(
+            User.username == body.username
+        )
+    )
+
+    stored_hash = (
+        user.password_hash
+        if user is not None
+        else DUMMY_PASSWORD_HASH
+    )
+
+    password_valid = verify_password(
+        body.password,
+        stored_hash,
+    )
+
+    if user is None or not password_valid:
+        raise HTTPException(
+            status_code=401,
+            detail="用户名或密码错误",
+        )
+
+    token = create_access_token(user.id)
+
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+    }

@@ -4,16 +4,16 @@ import secrets
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import URL, create_engine, event
+from sqlalchemy.orm import Session
 
-# 必须放在导入 main 前面，仅影响本次测试进程。
 os.environ["JWT_SECRET"] = secrets.token_hex(32)
 
 import main
-from db import Base, enable_foreign_keys
+from db import Base, enable_foreign_keys, get_db
 
 
 @pytest.fixture
-def client(tmp_path, monkeypatch):
+def client(tmp_path):
     test_engine = create_engine(
         URL.create(
             "sqlite",
@@ -27,13 +27,17 @@ def client(tmp_path, monkeypatch):
         enable_foreign_keys,
     )
 
-    # 当前所有接口都使用 main 模块里的 engine。
-    monkeypatch.setattr(main, "engine", test_engine)
+    def override_get_db():
+        with Session(test_engine) as session:
+            yield session
 
     try:
         Base.metadata.create_all(test_engine)
 
+        main.app.dependency_overrides[get_db] = override_get_db
+
         with TestClient(main.app) as test_client:
             yield test_client
     finally:
+        main.app.dependency_overrides.pop(get_db, None)
         test_engine.dispose()
