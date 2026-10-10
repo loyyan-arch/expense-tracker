@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -12,13 +12,14 @@ from security import (
     verify_password,
     create_access_token,
 )
+from rate_limit import LoginRateLimiter
 
 
 router = APIRouter(
     prefix="/auth",
     tags=["认证"],
 )
-
+login_limiter = LoginRateLimiter(limit=5, window_seconds=60)
 
 DUMMY_PASSWORD_HASH = hash_password(
     "dummy-password-for-login-timing"
@@ -76,7 +77,20 @@ def register(body: UserCreate,session: Session = Depends(get_db),):
     
 
 @router.post("/login", response_model=TokenResponse)
-def login(body: UserLogin,session: Session = Depends(get_db),):
+def login(
+    body: UserLogin,
+    request: Request,
+    session: Session = Depends(get_db),
+):
+    source = request.client.host if request.client else "unknown"
+    allowed, retry_after = login_limiter.check(source)
+
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail="登录请求过于频繁，请稍后重试",
+            headers={"Retry-After": str(retry_after)},
+        )
 
     user = session.scalar(
         select(User).where(

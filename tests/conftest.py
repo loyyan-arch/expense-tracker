@@ -6,10 +6,13 @@ from fastapi.testclient import TestClient
 from sqlalchemy import URL, create_engine, event
 from sqlalchemy.orm import Session
 
+
 os.environ["JWT_SECRET"] = secrets.token_hex(32)
 
 import main
 from db import Base, enable_foreign_keys, get_db
+from rate_limit import LoginRateLimiter
+from routers import auth
 
 
 @pytest.fixture
@@ -41,3 +44,11 @@ def client(tmp_path):
     finally:
         main.app.dependency_overrides.pop(get_db, None)
         test_engine.dispose()
+
+@pytest.fixture(autouse=True)
+def fresh_login_limiter(monkeypatch):
+    monkeypatch.setattr(
+        auth,
+        "login_limiter",
+        LoginRateLimiter(limit=5, window_seconds=60),
+    )
