@@ -1,87 +1,24 @@
-from re import U
-from fastapi import FastAPI, HTTPException,Response,Query, Depends
 from datetime import date
 from typing import Literal
 
+from fastapi import FastAPI, HTTPException, Response, Query, Depends
+from sqlalchemy import select, func
 from sqlalchemy.orm import Session
-from sqlalchemy import select,func
 
 from db import get_db
-from models import Transaction,User
-
-from sqlalchemy.exc import IntegrityError
-from security import (
-    hash_password,
-    verify_password,
-    create_access_token,
-    decode_access_token,
-)
-
+from dependencies import get_current_user
+from models import Transaction
+from routers import auth
 from schemas import (
-    UserLogin,
-    TokenResponse,
-    UserCreate,
     UserPublic,
     TransactionCreate,
     TransactionUpdate,
 )
 
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from jwt.exceptions import InvalidTokenError
-
 
 app = FastAPI(title="个人记账 API")
 
-
-
-
-
-DUMMY_PASSWORD_HASH = hash_password(
-    "dummy-password-for-login-timing"
-)
-
-bearer_scheme = HTTPBearer(auto_error=False)
-
-
-def get_current_user(
-    credentials: HTTPAuthorizationCredentials | None = Depends(
-        bearer_scheme
-    ),
-    session: Session = Depends(get_db),
-) -> UserPublic:
-    unauthorized = HTTPException(
-        status_code=401,
-        detail="未登录或登录凭证无效",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-
-    if credentials is None:
-        raise unauthorized
-
-    try:
-        user_id = decode_access_token(credentials.credentials)
-    except InvalidTokenError:
-        raise unauthorized
-
-
-    user = session.get(User, user_id)
-
-    if user is None:
-        raise unauthorized
-
-    return UserPublic(
-        id=user.id,
-        username=user.username,
-    )
-    
-@app.get("/auth/me", response_model=UserPublic)
-def get_me(
-    current_user: UserPublic = Depends(get_current_user),
-):
-    return current_user
-
-
-
+app.include_router(auth.router)
 
 
 @app.get("/")
@@ -343,78 +280,3 @@ def get_monthly_statistics(
         "balance_cents": income - expense,
     }
 
-
-@app.post(
-    "/auth/register",
-    status_code=201,
-    response_model=UserPublic,
-)
-def register(body: UserCreate,session: Session = Depends(get_db),):
-    hashed_password = hash_password(body.password)
-
-    user = User(
-        username=body.username,
-        password_hash=hashed_password,
-    )
-
-    session.add(user)
-
-    try:
-        session.commit()
-    except IntegrityError:
-        session.rollback()
-
-        existing_user = session.scalar(
-            select(User).where(
-                User.username == body.username
-            )
-        )
-
-        if existing_user is not None:
-            raise HTTPException(
-                status_code=409,
-                detail="用户名已存在",
-            )
-
-        raise
-
-    session.refresh(user)
-
-    return {
-        "id": user.id,
-        "username": user.username,
-    }
-    
-
-@app.post("/auth/login", response_model=TokenResponse)
-def login(body: UserLogin,session: Session = Depends(get_db),):
-
-    user = session.scalar(
-        select(User).where(
-            User.username == body.username
-        )
-    )
-
-    stored_hash = (
-        user.password_hash
-        if user is not None
-        else DUMMY_PASSWORD_HASH
-    )
-
-    password_valid = verify_password(
-        body.password,
-        stored_hash,
-    )
-
-    if user is None or not password_valid:
-        raise HTTPException(
-            status_code=401,
-            detail="用户名或密码错误",
-        )
-
-    token = create_access_token(user.id)
-
-    return {
-        "access_token": token,
-        "token_type": "bearer",
-    }
