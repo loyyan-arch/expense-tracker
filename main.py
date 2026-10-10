@@ -2,8 +2,6 @@ from fastapi import FastAPI, HTTPException,Response,Query, Depends
 from datetime import date
 from typing import Literal
 
-from pydantic import BaseModel, Field, ConfigDict
-
 from sqlalchemy.orm import Session
 from sqlalchemy import select,func
 
@@ -18,6 +16,15 @@ from security import (
     decode_access_token,
 )
 
+from schemas import (
+    UserLogin,
+    TokenResponse,
+    UserCreate,
+    UserPublic,
+    TransactionCreate,
+    TransactionUpdate,
+)
+
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jwt.exceptions import InvalidTokenError
 
@@ -25,36 +32,7 @@ from jwt.exceptions import InvalidTokenError
 app = FastAPI(title="个人记账 API")
 
 
-class UserLogin(BaseModel):
-    username: str = Field(min_length=3, max_length=32)
-    password: str = Field(
-        min_length=1,
-        max_length=128,
-        repr=False,
-    )
 
-
-class TokenResponse(BaseModel):
-    access_token: str
-    token_type: Literal["bearer"] = "bearer"
-
-
-class UserCreate(BaseModel):
-    username: str = Field(
-        min_length=3,
-        max_length=32,
-        pattern=r"^[a-z0-9_]+$",
-    )
-    password: str = Field(
-        min_length=7,
-        max_length=128,
-        repr=False,
-    )
-
-
-class UserPublic(BaseModel):
-    id: int
-    username: str
 
 
 DUMMY_PASSWORD_HASH = hash_password(
@@ -136,27 +114,6 @@ def get_transaction(id: int,current_user: UserPublic = Depends(get_current_user)
             "note": transaction.note,
             "created_at": transaction.created_at,
         }
-
-
-class TransactionCreate(BaseModel):
-    kind: Literal["income", "expense"]
-    amount_cents: int = Field(gt=0, strict=True)
-    category: Literal["餐饮", "交通", "购物", "工资", "其他"]
-    occurred_on: date
-    note: str = Field(default="", max_length=200)
-    model_config = ConfigDict(extra="forbid")
-
-class TransactionUpdate(BaseModel):
-    kind: Literal["income", "expense"] | None = None
-    amount_cents: int | None = Field(
-        default=None,
-        gt=0,
-        strict=True,
-    )
-    model_config = ConfigDict(extra="forbid")
-    category: Literal["餐饮", "交通", "购物", "工资", "其他"] | None = None
-    occurred_on: date | None = None
-    note: str | None = Field(default=None, max_length=200)
 
 
 
