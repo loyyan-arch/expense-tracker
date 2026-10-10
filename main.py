@@ -3,7 +3,7 @@ import logging
 from fastapi import FastAPI
 
 from request_logging import setup_request_logging
-from routers import auth, transactions, statistics
+from routers import auth, transactions, statistics, health
 
 
 logging.basicConfig(
@@ -18,6 +18,7 @@ setup_request_logging(app)
 app.include_router(auth.router)
 app.include_router(transactions.router)
 app.include_router(statistics.router)
+app.include_router(health.router)
 
 
 @app.get("/")
