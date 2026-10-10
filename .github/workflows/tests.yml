@@ -37,7 +37,7 @@ jobs:
       - name: Run tests
         run: python -m pytest tests -q
 
-            - name: Verify database migrations
+      - name: Verify database migrations
         env:
           JWT_SECRET: "ci-only-migration-key-not-for-real-use-123456"
           DATABASE_PATH: ${{ runner.temp }}/migration-check.db
