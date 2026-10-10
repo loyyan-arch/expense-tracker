@@ -1,6 +1,6 @@
 from pwdlib import PasswordHash
 
-import os
+from config import settings
 from datetime import datetime, timedelta, timezone
 
 import jwt
@@ -19,13 +19,9 @@ def verify_password(password: str, password_hash: str) -> bool:
     return password_hasher.verify(password, password_hash)
 
 
-JWT_SECRET = os.environ.get("JWT_SECRET")
-
-if not JWT_SECRET:
-    raise RuntimeError("请先设置 JWT_SECRET 环境变量")
-
+JWT_SECRET = settings.jwt_secret.get_secret_value()
 JWT_ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = settings.access_token_expire_minutes
 
 
 def create_access_token(user_id: int) -> str:
