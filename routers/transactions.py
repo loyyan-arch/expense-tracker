@@ -12,6 +12,7 @@ from schemas import (
     TransactionCreate,
     TransactionUpdate,
     UserPublic,
+    TransactionPublic,
 )
 
 
@@ -21,7 +22,7 @@ router = APIRouter(
 )
 
 
-@router.get("/{id}")
+@router.get("/{id}", response_model=TransactionPublic)
 def get_transaction(id: int,current_user: UserPublic = Depends(get_current_user),
                     session: Session = Depends(get_db),):
 
@@ -38,19 +39,11 @@ def get_transaction(id: int,current_user: UserPublic = Depends(get_current_user)
             detail="账单不存在",
         )
 
-    return {
-        "id": transaction.id,
-        "kind": transaction.kind,
-        "amount_cents": transaction.amount_cents,
-        "category": transaction.category,
-        "occurred_on": transaction.occurred_on,
-        "note": transaction.note,
-        "created_at": transaction.created_at,
-    }
+    return transaction
 
 
 
-@router.post("", status_code=201)
+@router.post("", status_code=201, response_model=TransactionPublic)
 def create_transaction(body: TransactionCreate,current_user: UserPublic = Depends(get_current_user),
                        session: Session = Depends(get_db),):
 
@@ -63,15 +56,7 @@ def create_transaction(body: TransactionCreate,current_user: UserPublic = Depend
     session.commit()
     session.refresh(transaction)
 
-    return {
-        "id": transaction.id,
-        "kind": transaction.kind,
-        "amount_cents": transaction.amount_cents,
-        "category": transaction.category,
-        "occurred_on": transaction.occurred_on,
-        "note": transaction.note,
-        "created_at": transaction.created_at,
-    }
+    return transaction
     
 
 @router.delete("/{id}", status_code=204)
@@ -99,7 +84,7 @@ def delete_transaction(
     return Response(status_code=204)
 
 
-@router.patch("/{id}")
+@router.patch("/{id}", response_model=TransactionPublic)
 def update_transaction(id: int, body: TransactionUpdate,current_user: UserPublic = Depends(get_current_user),
                        session: Session = Depends(get_db),):
     changes = body.model_dump(exclude_unset=True)
@@ -136,18 +121,10 @@ def update_transaction(id: int, body: TransactionUpdate,current_user: UserPublic
     session.commit()
     session.refresh(transaction)
 
-    return {
-        "id": transaction.id,
-        "kind": transaction.kind,
-        "amount_cents": transaction.amount_cents,
-        "category": transaction.category,
-        "occurred_on": transaction.occurred_on,
-        "note": transaction.note,
-        "created_at": transaction.created_at,
-    }
+    return transaction
     
 
-@router.get("")
+@router.get("", response_model=list[TransactionPublic])
 def list_transactions(
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=10, ge=1, le=100),
@@ -202,15 +179,4 @@ def list_transactions(
 
     transactions = session.scalars(statement).all()
 
-    return [
-        {
-            "id": transaction.id,
-            "kind": transaction.kind,
-            "amount_cents": transaction.amount_cents,
-            "category": transaction.category,
-            "occurred_on": transaction.occurred_on,
-            "note": transaction.note,
-            "created_at": transaction.created_at,
-        }
-        for transaction in transactions
-    ]
+    return transactions

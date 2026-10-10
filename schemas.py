@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -55,4 +55,15 @@ class TransactionUpdate(BaseModel):
     category: Literal["餐饮", "交通", "购物", "工资", "其他"] | None = None
     occurred_on: date | None = None
     note: str | None = Field(default=None, max_length=200)
+
+class TransactionPublic(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    kind: Literal["income", "expense"]
+    amount_cents: int
+    category: Literal["餐饮", "交通", "购物", "工资", "其他"]
+    occurred_on: date
+    note: str
+    created_at: datetime
 
