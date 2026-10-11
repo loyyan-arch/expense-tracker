@@ -109,10 +109,16 @@ def login(
         stored_hash,
     )
 
-    if user is None or not password_valid:
+    if user is None:
         raise HTTPException(
             status_code=401,
-            detail="用户名或密码错误",
+            detail="用户名不存在，请先注册",
+        )
+
+    if not password_valid:
+        raise HTTPException(
+            status_code=401,
+            detail="密码错误",
         )
 
     token = create_access_token(user.id)
