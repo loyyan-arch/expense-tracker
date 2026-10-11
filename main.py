@@ -1,6 +1,9 @@
 import logging
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 
 from request_logging import setup_request_logging
 from routers import auth, transactions, statistics, health
@@ -12,6 +15,25 @@ logging.basicConfig(
 )
 
 app = FastAPI(title="个人记账 API")
+
+@app.exception_handler(RequestValidationError)
+async def handle_request_validation_error(
+    request: Request,
+    exc: RequestValidationError,
+):
+    errors = [
+        {
+            "loc": error["loc"],
+            "msg": error["msg"],
+            "type": error["type"],
+        }
+        for error in exc.errors()
+    ]
+
+    return JSONResponse(
+        status_code=422,
+        content=jsonable_encoder({"detail": errors}),
+    )
 
 setup_request_logging(app)
 
