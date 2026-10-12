@@ -1,0 +1,88 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  color: #172b3a;
+  background: #f4f6f8;
+}
+
+.site-header,
+.page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.site-header h1 {
+  margin-top: 0;
+}
+
+nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+nav a {
+  color: #37576b;
+  text-underline-offset: 5px;
+}
+
+nav a.router-link-active {
+  color: #096b58;
+  font-weight: 700;
+}
+
+a:focus-visible {
+  outline: 2px solid #096b58;
+  outline-offset: 4px;
+}
+
+.page section {
+  padding: 24px;
+  background: white;
+  border-radius: 12px;
+}
+
+input,
+select,
+button {
+  font: inherit;
+}
+
+button,
+input,
+select {
+  min-height: 44px;
+}
+
+:where(a, button, input, select):focus-visible {
+  outline: 3px solid #096b58;
+  outline-offset: 3px;
+}
+
+nav {
+  align-items: center;
+}
+
+nav span {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 600px) {
+  .site-header,
+  .page {
+    padding: 16px;
+  }
+
+  .page section {
+    padding: 16px;
+  }
+
+  nav {
+    gap: 12px;
+  }
+}
