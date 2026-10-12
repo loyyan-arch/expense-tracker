@@ -20,23 +20,27 @@ async function logout() {
 
 <template>
   <header class="site-header">
-    <h1>个人记账</h1>
-
+    <RouterLink class="brand" :to="user ? '/transactions' : '/login'">
+      <span class="brand-mark" aria-hidden="true">▤</span>
+      <span>口袋账本<small>把生活，一笔一笔记下来。</small></span>
+    </RouterLink>
     <nav aria-label="主导航">
       <template v-if="user">
         <RouterLink to="/transactions">账单</RouterLink>
-        <span>当前用户：{{ user.username }}</span>
+        <span class="user-chip">☺ {{ user.username }}</span>
         <button type="button" @click="logout">退出登录</button>
       </template>
-
       <template v-else>
         <RouterLink to="/login">登录</RouterLink>
         <RouterLink to="/register">注册</RouterLink>
       </template>
     </nav>
   </header>
-
   <main class="page">
     <RouterView />
   </main>
+  <footer class="site-footer">
+    <span>POCKET NOTES / 口袋账本</span>
+    <span>认真记账，好好生活 ✳</span>
+  </footer>
 </template>
