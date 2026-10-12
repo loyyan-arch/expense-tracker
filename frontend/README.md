@@ -36,6 +36,6 @@ npm run build
 
 构建产物位于 dist/，不提交 Git；node_modules/ 同样忽略，package-lock.json 需要提交。
 
-GitHub 前端工作流执行 npm ci、测试和构建，远端结果需在 PR 中核验。当前尚未部署前端。生产环境需要静态服务器、history 路由回退及 /api 反向代理；Vite dev/preview 不作为生产服务器。
+GitHub 前端工作流执行 npm ci、测试和构建，远端结果需在 PR 中核验。前端 1.0.0 已部署至服务器，通过 SSH 隧道验收（学习者反馈）。Nginx 提供静态文件、history 回退与 /api 反向代理。备案仍在审批，正式域名与 HTTPS 尚未配置；Vite dev/preview 不作为生产服务器。
 
 完整学习与交付状态见 ../doc/前端学习清单.md 和 ../doc/前端开发清单.md。
