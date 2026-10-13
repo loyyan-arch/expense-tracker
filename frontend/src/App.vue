@@ -27,6 +27,7 @@ async function logout() {
     <nav aria-label="主导航">
       <template v-if="user">
         <RouterLink to="/transactions">账单</RouterLink>
+        <RouterLink to="/statistics/yearly">年度统计</RouterLink>
         <span class="user-chip">☺ {{ user.username }}</span>
         <button type="button" @click="logout">退出登录</button>
       </template>

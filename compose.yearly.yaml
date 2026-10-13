@@ -1,0 +1,6 @@
+# Release overlay: use after compose.yaml and compose.web.yaml.
+services:
+  api:
+    image: expense-tracker:1.1.0
+  web:
+    image: expense-tracker-web:1.1.0
