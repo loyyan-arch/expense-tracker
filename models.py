@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import CheckConstraint, String, func, ForeignKey
+from sqlalchemy import CheckConstraint, String, func, ForeignKey, BigInteger
 from sqlalchemy.orm import Mapped, mapped_column
 
 from db import Base
@@ -41,3 +41,32 @@ class User(Base):
         server_default=func.current_timestamp()
     )
 
+class LoginSession(Base):
+    __tablename__ = "login_sessions"
+
+    token_hash: Mapped[str] = mapped_column(
+        String(64),
+        primary_key=True,
+    )
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"),
+        nullable=False,
+        index=True,
+    )
+
+    created_at: Mapped[int] = mapped_column(
+        BigInteger,
+        nullable=False,
+    )
+
+    expires_at: Mapped[int] = mapped_column(
+        BigInteger,
+        nullable=False,
+        index=True,
+    )
+
+    revoked_at: Mapped[int | None] = mapped_column(
+        BigInteger,
+        nullable=True,
+    )

@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { user } from '@/auth'
+import { user, restoreSession } from '@/auth'
 import LoginView from '../views/LoginView.vue'
 import RegisterView from '../views/RegisterView.vue'
 import TransactionsView from '../views/TransactionsView.vue'
@@ -29,7 +29,13 @@ const router = createRouter({
   ],
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
+  try {
+    await restoreSession()
+  } catch {
+    // 保留目标地址；App 显示恢复失败和重试入口，不把网络故障当退出。
+    return
+  }
   if (to.meta.requiresAuth && !user.value) {
     return '/login'
   }

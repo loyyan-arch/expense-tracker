@@ -6,22 +6,61 @@ interface User {
   username: string
 }
 
-interface TokenResponse {
-  access_token: string
-  token_type: string
-}
-
 const currentUser = ref<User | null>(null)
 const notice = ref('')
-let accessToken = ''
+const ready = ref(false)
+const restoreError = ref('')
+let revision = 0
+let restoring: Promise<void> | undefined
 
 export const user = readonly(currentUser)
 export const authNotice = readonly(notice)
+export const authReady = readonly(ready)
+export const authRestoreError = readonly(restoreError)
 
 export function clearSession(message = '') {
-  accessToken = ''
+  revision += 1
   currentUser.value = null
   notice.value = message
+  ready.value = true
+  restoreError.value = ''
+}
+
+function requireUser(value: User | undefined): User {
+  if (!value || !Number.isSafeInteger(value.id) || value.id <= 0 ||
+      typeof value.username !== 'string' || !value.username) {
+    throw new Error('获取当前用户失败，请重试')
+  }
+  return value
+}
+
+// 同时发生的路由导航共用一次恢复请求。网络错误可以再次调用重试。
+export function restoreSession(): Promise<void> {
+  if (ready.value) return Promise.resolve()
+  if (restoring) return restoring
+  const started = revision
+  restoreError.value = ''
+  const pending = (async () => {
+    try {
+      const me = requireUser(await apiRequest<User>('/auth/me'))
+      if (revision !== started) return
+      currentUser.value = me
+      ready.value = true
+    } catch (error) {
+      if (revision !== started) return
+      if (error instanceof ApiError && error.status === 401) {
+        clearSession()
+        return
+      }
+      restoreError.value = authErrorMessage(error)
+      throw error
+    }
+  })()
+  restoring = pending
+  void pending.finally(() => {
+    if (restoring === pending) restoring = undefined
+  }).catch(() => {})
+  return pending
 }
 
 export async function register(
@@ -48,44 +87,32 @@ export async function login(
   password: string,
   signal?: AbortSignal,
 ) {
-  const result = await apiRequest<TokenResponse>('/auth/login', {
+  const started = ++revision
+  const result = await apiRequest<User>('/auth/browser/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }),
     signal,
   })
 
-  if (
-    !result ||
-    typeof result.access_token !== 'string' ||
-    !result.access_token ||
-    result.token_type !== 'bearer'
-  ) {
-    throw new Error('登录响应异常，请重试')
-  }
-
-  // 获取真实用户信息，两次请求都成功后才保存登录状态。
-  const me = await apiRequest<User>('/auth/me', {
-    headers: { Authorization: `Bearer ${result.access_token}` },
-    signal,
-  })
-
-  if (
-    !me ||
-    typeof me.id !== 'number' ||
-    typeof me.username !== 'string'
-  ) {
-    throw new Error('获取当前用户失败，请重新登录')
-  }
+  const me = requireUser(result)
 
   // 离开登录页面后，不再写入此次请求的结果。
-  if (signal?.aborted) {
+  if (signal?.aborted || revision !== started) {
     throw new Error('登录已取消')
   }
 
-  accessToken = result.access_token
   currentUser.value = me
   notice.value = ''
+  ready.value = true
+  restoreError.value = ''
+}
+
+export async function logout() {
+  const started = ++revision
+  await apiRequest('/auth/browser/logout', { method: 'POST' })
+  if (revision !== started) throw new Error('登录状态已改变，请重新操作')
+  clearSession()
 }
 
 // 后续账单和统计接口统一使用这个函数。
@@ -93,20 +120,17 @@ export async function authRequest<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T | undefined> {
-  const requestToken = accessToken
+  const started = revision
 
-  if (!requestToken) {
+  if (!currentUser.value) {
     clearSession('请先登录')
     throw new ApiError('请先登录', 401)
   }
 
-  const headers = new Headers(options.headers)
-  headers.set('Authorization', `Bearer ${requestToken}`)
-
   try {
-    const result = await apiRequest<T>(path, { ...options, headers })
+    const result = await apiRequest<T>(path, options)
 
-    if (accessToken !== requestToken) {
+    if (revision !== started) {
       throw new Error('登录状态已改变，请重新操作')
     }
 
@@ -115,7 +139,7 @@ export async function authRequest<T>(
     if (
       error instanceof ApiError &&
       error.status === 401 &&
-      accessToken === requestToken
+      revision === started
     ) {
       clearSession('登录已失效，请重新登录')
     }
