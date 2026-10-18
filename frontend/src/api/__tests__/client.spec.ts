@@ -18,6 +18,15 @@ function mockResponse(body: unknown, status = 200) {
 }
 
 describe('apiRequest', () => {
+  it.each(['POST', 'PATCH', 'DELETE'])('给 %s 请求添加 CSRF 防护头并携带同源 Cookie', async (method) => {
+    mockResponse({ ok: true })
+    await apiRequest('/transactions', { method })
+    const options = vi.mocked(fetch).mock.calls[0]?.[1]
+    expect(new Headers(options?.headers).get('X-CSRF-Protection')).toBe('1')
+    expect(options?.credentials).toBe('same-origin')
+    expect(options?.cache).toBe('no-store')
+  })
+
   it('返回成功响应中的 JSON', async () => {
     mockResponse({ status: 'ok' })
 

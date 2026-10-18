@@ -25,6 +25,13 @@ class Settings(BaseSettings):
 
     database_path: Path = BASE_DIR / "expenses.db"
 
+    # HTTP 本地开发需显式设为 false；公网 HTTPS 保持 true。
+    session_cookie_secure: bool = True
+    browser_origins: list[str] = [
+        "http://localhost:5173", "http://127.0.0.1:5173",
+        "http://localhost:18080", "http://127.0.0.1:18080",
+    ]
+
     @field_validator("database_path")
     @classmethod
     def resolve_database_path(cls, value: Path) -> Path:

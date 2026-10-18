@@ -64,7 +64,7 @@ def test_invalid_credentials_are_rejected(client, authorization):
     assert response.status_code == 401
 
 @pytest.mark.parametrize("case", ["wrong_signature", "expired"])
-def test_invalid_signed_token_is_rejected(client, case):
+def test_legacy_invalid_jwt_is_rejected(client, case):
     credentials = {
         "username": "token_test_user",
         "password": "test-password-for-learning!",

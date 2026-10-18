@@ -37,6 +37,9 @@ export class ApiError extends Error {
   ): Promise<T | undefined> {
     const headers = new Headers(options.headers)
     headers.set('Accept', 'application/json')
+    if (!['GET', 'HEAD', 'OPTIONS'].includes((options.method ?? 'GET').toUpperCase())) {
+      headers.set('X-CSRF-Protection', '1')
+    }
   
     let response: Response
   
@@ -44,6 +47,8 @@ export class ApiError extends Error {
       response = await fetch(`/api${path}`, {
         ...options,
         headers,
+        credentials: 'same-origin',
+        cache: 'no-store',
       })
     } catch {
       throw new ApiError('无法连接服务，请检查网络或服务是否启动', 0)
